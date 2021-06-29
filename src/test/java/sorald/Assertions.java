@@ -1,6 +1,9 @@
 package sorald;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,6 +15,8 @@ import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import javax.tools.ToolProvider;
 import org.apache.commons.lang3.tuple.Pair;
+import sorald.rule.Rule;
+import sorald.sonar.ProjectScanner;
 
 /** High-level assertions. */
 public class Assertions {
@@ -53,5 +58,27 @@ public class Assertions {
                         .collect(Collectors.joining(System.lineSeparator()));
 
         return Pair.of(success, diagnosticsOutput);
+    }
+
+    /**
+     * Assert that the provided file has at least one violation of the rule.
+     *
+     * @param file A file to analyze.
+     * @param rule A rule to analyze for.
+     */
+    public static void assertHasRuleViolation(File file, Rule rule) {
+        var violations = ProjectScanner.scanProject(file, file.getParentFile(), rule);
+        assertThat(violations, is(not(empty())));
+    }
+
+    /**
+     * Assert that the provided file has no violations of the rule.
+     *
+     * @param file A file to analyze.
+     * @param rule A rule to analyze for.
+     */
+    public static void assertNoRuleViolations(File file, Rule rule) {
+        var violations = ProjectScanner.scanProject(file, file.getParentFile(), rule);
+        assertThat(violations, is(empty()));
     }
 }

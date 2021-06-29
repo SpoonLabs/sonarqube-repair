@@ -50,8 +50,8 @@ class ProcessorTestFilesCompileTest {
         return validJavaFile;
     }
 
-    private static Stream<ProcessorTestHelper.ProcessorTestCase<?>>
-            getCompilableProcessorTestCases() throws IOException {
+    private static Stream<ProcessorTestHelper.ProcessorTestCase> getCompilableProcessorTestCases()
+            throws IOException {
         return ProcessorTestHelper.getTestCasesInTemporaryDirectory()
                 .filter(
                         tc ->

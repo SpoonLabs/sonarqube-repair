@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import sorald.Constants;
 import sorald.annotations.ProcessorAnnotation;
-import sorald.sonar.RuleViolation;
+import sorald.rule.RuleViolation;
 import spoon.reflect.code.*;
 import spoon.reflect.factory.TypeFactory;
 import spoon.reflect.reference.CtTypeReference;

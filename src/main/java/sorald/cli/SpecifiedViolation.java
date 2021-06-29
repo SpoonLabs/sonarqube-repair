@@ -1,13 +1,11 @@
 package sorald.cli;
 
 import java.nio.file.Path;
-import sorald.sonar.Checks;
-import sorald.sonar.RuleViolation;
+import sorald.rule.RuleViolation;
 
 /** Rule violation specified from the CLI. */
 class SpecifiedViolation extends RuleViolation {
     private final String ruleKey;
-    private final String checkName;
     private final Path absPath;
     private final int startLine;
     private final int startCol;
@@ -17,7 +15,6 @@ class SpecifiedViolation extends RuleViolation {
     SpecifiedViolation(
             String ruleKey, Path absPath, int startLine, int startCol, int endLine, int endCol) {
         this.ruleKey = ruleKey;
-        checkName = Checks.getCheck(ruleKey).getSimpleName();
         this.absPath = absPath;
         this.startLine = startLine;
         this.endLine = endLine;
@@ -48,11 +45,6 @@ class SpecifiedViolation extends RuleViolation {
     @Override
     public Path getAbsolutePath() {
         return absPath;
-    }
-
-    @Override
-    public String getCheckName() {
-        return checkName;
     }
 
     @Override

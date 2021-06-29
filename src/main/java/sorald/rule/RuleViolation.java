@@ -1,4 +1,4 @@
-package sorald.sonar;
+package sorald.rule;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -23,9 +23,6 @@ public abstract class RuleViolation implements Comparable<RuleViolation> {
 
     /** @return Absolute and normalized path to the analyzed file. */
     public abstract Path getAbsolutePath();
-
-    /** @return The name of the check class that generated this warning. */
-    public abstract String getCheckName();
 
     /** @return The key of the violated rule. */
     public abstract String getRuleKey();
@@ -65,7 +62,6 @@ public abstract class RuleViolation implements Comparable<RuleViolation> {
         // IMPORTANT: The message is intentionally not part of the equality check to allow for
         // comparing message-less implementations with those that do carry messages
         return getAbsolutePath().equals(other.getAbsolutePath())
-                && getCheckName().equals(other.getCheckName())
                 && getRuleKey().equals(other.getRuleKey())
                 && getStartLine() == other.getStartLine()
                 && getEndLine() == other.getEndLine()
@@ -79,7 +75,6 @@ public abstract class RuleViolation implements Comparable<RuleViolation> {
         // comparing message-less implementations with those that do carry messages
         return Objects.hash(
                 getAbsolutePath(),
-                getCheckName(),
                 getRuleKey(),
                 getStartLine(),
                 getEndLine(),

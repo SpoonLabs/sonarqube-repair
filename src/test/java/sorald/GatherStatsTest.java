@@ -15,14 +15,13 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.sonar.plugins.java.api.JavaFileScanner;
 import sorald.event.StatsMetadataKeys;
 import sorald.processor.ProcessorTestHelper;
-import sorald.processor.SoraldAbstractProcessor;
 import sorald.processor.XxeProcessingProcessor;
-import sorald.sonar.Checks;
+import sorald.rule.Rule;
+import sorald.rule.RuleViolation;
 import sorald.sonar.ProjectScanner;
-import sorald.sonar.RuleViolation;
+import sorald.sonar.SonarRule;
 
 public class GatherStatsTest {
 
@@ -30,7 +29,7 @@ public class GatherStatsTest {
     @EnumSource(value = RepairStrategy.class)
     public void statisticsFile_containsExpectedStats(
             RepairStrategy repairStrategy, @TempDir File tempDir) throws Exception {
-        ProcessorTestHelper.ProcessorTestCase<?> testCase =
+        ProcessorTestHelper.ProcessorTestCase testCase =
                 ProcessorTestHelper.getTestCasesInTemporaryDirectory()
                         .filter(tc -> tc.ruleKey.equals(new XxeProcessingProcessor().getRuleKey()))
                         .findFirst()
@@ -48,7 +47,7 @@ public class GatherStatsTest {
 
         ProcessorTestHelper.runSorald(
                 tempDir,
-                testCase.checkClass,
+                testCase.getRule(),
                 Constants.ARG_STATS_OUTPUT_FILE,
                 statsFile.getAbsolutePath(),
                 Constants.ARG_REPAIR_STRATEGY,
@@ -148,11 +147,10 @@ public class GatherStatsTest {
             MavenHelper.convertToMavenProject(project);
         }
 
-        SoraldAbstractProcessor<?> targetProc = new XxeProcessingProcessor();
-        JavaFileScanner targetCheck = Checks.getCheckInstance(targetProc.getRuleKey());
+        Rule targetRule = new SonarRule(new XxeProcessingProcessor().getRuleKey());
 
         Set<RuleViolation> violationsBefore =
-                ProjectScanner.scanProject(project, project, targetCheck);
+                ProjectScanner.scanProject(project, project, targetRule);
         RuleViolation targetViolation =
                 new ArrayList<>(violationsBefore).get(violationsBefore.size() / 2);
         String specifier = targetViolation.relativeSpecifier(project.toPath());
@@ -172,7 +170,7 @@ public class GatherStatsTest {
                 });
 
         Set<RuleViolation> violationsAfter =
-                ProjectScanner.scanProject(project, project, targetCheck);
+                ProjectScanner.scanProject(project, project, targetRule);
 
         return new TargetedRepairInfo(
                 project.toPath(),
@@ -180,7 +178,7 @@ public class GatherStatsTest {
                 violationsBefore,
                 violationsAfter,
                 targetViolation,
-                targetCheck);
+                targetRule);
     }
 
     /** A simple container for test statistics of a targeted repair. */
@@ -190,7 +188,7 @@ public class GatherStatsTest {
         final Set<RuleViolation> violationsBefore;
         final Set<RuleViolation> violationsAfter;
         final RuleViolation targetViolation;
-        final JavaFileScanner targetCheck;
+        final Rule targetRule;
 
         private TargetedRepairInfo(
                 Path projectPath,
@@ -198,13 +196,13 @@ public class GatherStatsTest {
                 Set<RuleViolation> violationsBefore,
                 Set<RuleViolation> violationsAfter,
                 RuleViolation targetViolation,
-                JavaFileScanner targetCheck) {
+                Rule targetRule) {
             this.projectPath = projectPath;
             this.statsFile = statsFile;
             this.violationsBefore = violationsBefore;
             this.violationsAfter = violationsAfter;
             this.targetViolation = targetViolation;
-            this.targetCheck = targetCheck;
+            this.targetRule = targetRule;
         }
     }
 }

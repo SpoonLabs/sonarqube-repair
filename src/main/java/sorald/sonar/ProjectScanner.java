@@ -3,12 +3,13 @@ package sorald.sonar;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-import org.sonar.plugins.java.api.JavaFileScanner;
 import sorald.Constants;
 import sorald.FileUtils;
+import sorald.rule.Rule;
+import sorald.rule.RuleViolation;
 
 /** Helper class that uses Sonar to scan projects for rule violations. */
 public class ProjectScanner {
@@ -19,12 +20,11 @@ public class ProjectScanner {
      *
      * @param target Targeted file or directory of the project.
      * @param baseDir Base directory of the project.
-     * @param sonarCheck The check to scan with.
+     * @param rule Rule to scan for.
      * @return All violations in the target.
      */
-    public static Set<RuleViolation> scanProject(
-            File target, File baseDir, JavaFileScanner sonarCheck) {
-        return scanProject(target, baseDir, List.of(sonarCheck));
+    public static Set<RuleViolation> scanProject(File target, File baseDir, Rule rule) {
+        return scanProject(target, baseDir, List.of(rule));
     }
 
     /**
@@ -32,12 +32,11 @@ public class ProjectScanner {
      *
      * @param target Targeted file or directory of the project.
      * @param baseDir Base directory of the project.
-     * @param sonarChecks Checks to scan with.
+     * @param rules Rules to scan for.
      * @return All violations in the target.
      */
-    public static Set<RuleViolation> scanProject(
-            File target, File baseDir, List<JavaFileScanner> sonarChecks) {
-        return scanProject(target, baseDir, sonarChecks, List.of());
+    public static Set<RuleViolation> scanProject(File target, File baseDir, List<Rule> rules) {
+        return scanProject(target, baseDir, rules, List.of());
     }
 
     /**
@@ -46,25 +45,26 @@ public class ProjectScanner {
      *
      * @param target Targeted file or directory of the project.
      * @param baseDir Base directory of the project.
-     * @param sonarChecks Checks to scan with.
+     * @param rules Rules to scan for.
      * @param classpath Classpath to fetch type information from.
      * @return All violations in the target.
      */
     public static Set<RuleViolation> scanProject(
-            File target, File baseDir, List<JavaFileScanner> sonarChecks, List<String> classpath) {
-        List<String> filesToScan = new ArrayList<>();
+            File target, File baseDir, List<Rule> rules, List<String> classpath) {
+        List<File> filesToScan = new ArrayList<>();
         if (target.isFile()) {
-            filesToScan.add(target.getAbsolutePath());
+            filesToScan.add(target);
         } else {
             try {
-                filesToScan =
-                        FileUtils.findFilesByExtension(target, Constants.JAVA_EXT).stream()
-                                .map(File::getAbsolutePath)
-                                .collect(Collectors.toList());
+                filesToScan = FileUtils.findFilesByExtension(target, Constants.JAVA_EXT);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        return RuleVerifier.analyze(filesToScan, baseDir, sonarChecks, classpath);
+
+        // TODO generalize to not directly use the SonarStaticAnalyzer
+        var violations =
+                new SonarStaticAnalyzer(baseDir).findViolations(filesToScan, rules, classpath);
+        return new HashSet<>(violations);
     }
 }

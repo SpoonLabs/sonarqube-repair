@@ -2,6 +2,8 @@ package sorald;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static sorald.Assertions.assertHasRuleViolation;
+import static sorald.Assertions.assertNoRuleViolations;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,11 +12,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.sonar.java.checks.DeadStoreCheck;
 import sorald.event.StatsMetadataKeys;
 import sorald.processor.CastArithmeticOperandProcessor;
 import sorald.processor.DeadStoreProcessor;
-import sorald.sonar.RuleVerifier;
+import sorald.rule.Rule;
 
 public class MavenLauncherTest {
 
@@ -28,11 +29,14 @@ public class MavenLauncherTest {
                         .toFile(),
                 workdir);
 
-        Path productionFile = workdir.toPath().resolve("src/main/java/sorald/test/App.java");
-        Path testFile = workdir.toPath().resolve("src/test/java/sorald/test/AppTest.java");
+        File productionFile =
+                workdir.toPath().resolve("src/main/java/sorald/test/App.java").toFile();
+        File testFile = workdir.toPath().resolve("src/test/java/sorald/test/AppTest.java").toFile();
 
-        RuleVerifier.verifyHasIssue(productionFile.toString(), new DeadStoreCheck());
-        RuleVerifier.verifyHasIssue(testFile.toString(), new DeadStoreCheck());
+        Rule deadStoreRule = Rule.of(new DeadStoreProcessor().getRuleKey());
+
+        assertHasRuleViolation(productionFile, deadStoreRule);
+        assertHasRuleViolation(testFile, deadStoreRule);
 
         String[] args =
                 new String[] {
@@ -49,8 +53,8 @@ public class MavenLauncherTest {
         Main.main(args);
 
         // assert
-        RuleVerifier.verifyNoIssue(productionFile.toString(), new DeadStoreCheck());
-        RuleVerifier.verifyNoIssue(testFile.toString(), new DeadStoreCheck());
+        assertNoRuleViolations(productionFile, deadStoreRule);
+        assertNoRuleViolations(testFile, deadStoreRule);
     }
 
     /**

@@ -12,7 +12,7 @@ import sorald.event.collectors.RepairStatisticsCollector;
 import sorald.event.models.RepairEvent;
 import sorald.event.models.WarningLocation;
 import sorald.event.models.miner.MinedViolationEvent;
-import sorald.sonar.Checks;
+import sorald.rule.Rule;
 
 /** Repair statistics for a single rule. */
 public class RuleRepairStatistics {
@@ -110,10 +110,10 @@ public class RuleRepairStatistics {
                                     keyToViolationsBefore.getOrDefault(key, List.of());
                             List<MinedViolationEvent> violationsAfter =
                                     keyToViolationsAfter.getOrDefault(key, List.of());
-                            String checkName = Checks.getCheck(key).getSimpleName();
+                            String ruleName = Rule.of(key).getName();
                             return new RuleRepairStatistics(
                                     key,
-                                    checkName.replace("Check", ""),
+                                    ruleName,
                                     violationsBefore,
                                     violationsAfter,
                                     repairs,

@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static sorald.Assertions.assertNoRuleViolations;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -18,13 +19,12 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.sonar.plugins.java.api.JavaFileScanner;
 import sorald.processor.BigDecimalDoubleConstructorProcessor;
 import sorald.processor.ProcessorTestHelper;
-import sorald.sonar.Checks;
+import sorald.rule.Rule;
+import sorald.rule.RuleViolation;
 import sorald.sonar.ProjectScanner;
-import sorald.sonar.RuleVerifier;
-import sorald.sonar.RuleViolation;
+import sorald.sonar.SonarRule;
 
 /** Tests for the targeted repair functionality of Sorald. */
 public class TargetedRepairTest {
@@ -47,7 +47,7 @@ public class TargetedRepairTest {
         // assert
         Set<RuleViolation> violationsAfter =
                 ProjectScanner.scanProject(
-                        workdirInfo.targetFile, workdirInfo.targetFile, workdirInfo.check);
+                        workdirInfo.targetFile, workdirInfo.targetFile, workdirInfo.rule);
 
         assertThat(violationsAfter.size(), equalTo(workdirInfo.numViolationsBefore - 1));
         assertFalse(violationsAfter.contains(workdirInfo.targetViolation));
@@ -120,7 +120,7 @@ public class TargetedRepairTest {
         // assert
         Set<RuleViolation> violationsAfter =
                 ProjectScanner.scanProject(
-                        workdirInfo.workdir, workdirInfo.workdir, workdirInfo.check);
+                        workdirInfo.workdir, workdirInfo.workdir, workdirInfo.rule);
         assertThat(violationsAfter.size(), equalTo(workdirInfo.numViolationsBefore - 1));
     }
 
@@ -129,9 +129,9 @@ public class TargetedRepairTest {
         // arrange
         TargetedRepairWorkdirInfo workdirInfo = setupWorkdir();
         // run Sorald to remove the violation
-        ProcessorTestHelper.runSorald(workdirInfo.workdir, workdirInfo.check.getClass());
-        RuleVerifier.verifyNoIssue(
-                workdirInfo.targetViolation.getAbsolutePath().toString(), workdirInfo.check);
+        ProcessorTestHelper.runSorald(workdirInfo.workdir, workdirInfo.rule);
+        assertNoRuleViolations(
+                workdirInfo.targetViolation.getAbsolutePath().toFile(), workdirInfo.rule);
         String violationSpec =
                 workdirInfo.targetViolation.relativeSpecifier(workdirInfo.workdir.toPath());
 
@@ -176,7 +176,7 @@ public class TargetedRepairTest {
         // assert
         Set<RuleViolation> violationsAfter =
                 ProjectScanner.scanProject(
-                        workdirInfo.workdir, workdirInfo.workdir, workdirInfo.check);
+                        workdirInfo.workdir, workdirInfo.workdir, workdirInfo.rule);
         assertThat(violationsAfter.size(), equalTo(workdirInfo.numViolationsBefore - 1));
     }
 
@@ -206,7 +206,7 @@ public class TargetedRepairTest {
         // assert
         Set<RuleViolation> violationsAfter =
                 ProjectScanner.scanProject(
-                        workdirInfo.workdir, workdirInfo.workdir, workdirInfo.check);
+                        workdirInfo.workdir, workdirInfo.workdir, workdirInfo.rule);
         assertThat(violationsAfter.size(), equalTo(workdirInfo.numViolationsBefore - 1));
     }
 
@@ -214,15 +214,14 @@ public class TargetedRepairTest {
     private static TargetedRepairWorkdirInfo setupWorkdir() throws IOException {
         Path workdir = TestHelper.createTemporaryProcessorTestFilesWorkspace();
 
-        String ruleKey = new BigDecimalDoubleConstructorProcessor().getRuleKey();
-        JavaFileScanner check = Checks.getCheckInstance(ruleKey);
+        Rule rule = new SonarRule(new BigDecimalDoubleConstructorProcessor().getRuleKey());
         File targetFile =
                 workdir.resolve("S2111_BigDecimalDoubleConstructor")
                         .resolve("BigDecimalDoubleConstructor.java")
                         .toFile();
 
         List<RuleViolation> violationsBefore =
-                new ArrayList<>(ProjectScanner.scanProject(targetFile, workdir.toFile(), check));
+                new ArrayList<>(ProjectScanner.scanProject(targetFile, workdir.toFile(), rule));
         assertThat(
                 "there must be more than 1 violation in the test file for an adequate test",
                 violationsBefore.size(),
@@ -231,25 +230,25 @@ public class TargetedRepairTest {
         RuleViolation violation = violationsBefore.get(violationsBefore.size() / 2);
 
         return new TargetedRepairWorkdirInfo(
-                workdir.toFile(), check, violationsBefore.size(), targetFile, violation);
+                workdir.toFile(), rule, violationsBefore.size(), targetFile, violation);
     }
 
     /** Simple container for info about the targeted repair working directory. */
     private static class TargetedRepairWorkdirInfo {
         final File workdir;
-        final JavaFileScanner check;
+        final Rule rule;
         final int numViolationsBefore;
         final File targetFile;
         final RuleViolation targetViolation;
 
         private TargetedRepairWorkdirInfo(
                 File workdirPath,
-                JavaFileScanner check,
+                Rule rule,
                 int numViolationsBefore,
                 File targetFile,
                 RuleViolation targetViolation) {
             this.workdir = workdirPath;
-            this.check = check;
+            this.rule = rule;
             this.numViolationsBefore = numViolationsBefore;
             this.targetFile = targetFile;
             this.targetViolation = targetViolation;

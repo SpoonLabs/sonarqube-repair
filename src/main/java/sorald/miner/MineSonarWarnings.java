@@ -4,17 +4,15 @@ import java.io.*;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.eclipse.jgit.api.Git;
-import org.sonar.plugins.java.api.JavaFileScanner;
-import sorald.Constants;
+import sorald.FileUtils;
 import sorald.event.EventHelper;
 import sorald.event.EventType;
 import sorald.event.SoraldEventHandler;
 import sorald.event.models.miner.MinedViolationEvent;
-import sorald.sonar.Checks;
-import sorald.sonar.RuleVerifier;
-import sorald.sonar.RuleViolation;
+import sorald.rule.Rule;
+import sorald.rule.RuleViolation;
+import sorald.sonar.ProjectScanner;
 
 public class MineSonarWarnings {
     final List<SoraldEventHandler> eventHandlers;
@@ -27,10 +25,7 @@ public class MineSonarWarnings {
     }
 
     public void mineGitRepos(
-            List<? extends JavaFileScanner> checks,
-            String outputPath,
-            List<String> reposList,
-            File repoDir)
+            List<Rule> rules, String outputPath, List<String> reposList, File repoDir)
             throws IOException {
         // stats on a list of git repos
         for (String repo : reposList) {
@@ -48,7 +43,7 @@ public class MineSonarWarnings {
                 e.printStackTrace();
             }
 
-            Map<String, Integer> warnings = extractWarnings(repoDir.getAbsolutePath(), checks);
+            Map<String, Integer> warnings = extractWarnings(repoDir.getAbsolutePath(), rules);
 
             PrintWriter pw = new PrintWriter(new FileWriter(outputPath, true));
 
@@ -67,8 +62,8 @@ public class MineSonarWarnings {
         }
     }
 
-    public void mineLocalProject(List<? extends JavaFileScanner> checks, String projectPath) {
-        Map<String, Integer> warnings = extractWarnings(projectPath, checks);
+    public void mineLocalProject(List<Rule> rules, String projectPath) {
+        Map<String, Integer> warnings = extractWarnings(projectPath, rules);
 
         warnings.entrySet().stream()
                 .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
@@ -77,50 +72,38 @@ public class MineSonarWarnings {
 
     /**
      * @param projectPath The root path to a Java project
-     * @param checks Checks to run on the Java files in the project
+     * @param rules Rules to find violations of in the Java files in the project
      * @return A mapping (checkClassName<ruleKey> -> numViolations)
      */
-    Map<String, Integer> extractWarnings(
-            String projectPath, List<? extends JavaFileScanner> checks) {
-        List<String> filesToScan = new ArrayList<>();
-        File file = new File(projectPath);
-        if (file.isFile()) {
-            filesToScan.add(file.getAbsolutePath());
-        } else {
-            try {
-                filesToScan =
-                        sorald.FileUtils.findFilesByExtension(file, Constants.JAVA_EXT).stream()
-                                .map(File::toString)
-                                .collect(Collectors.toList());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+    Map<String, Integer> extractWarnings(String projectPath, List<Rule> rules) {
+        final Map<Rule, Integer> warnings = new HashMap<>();
+        final var target = new File(projectPath);
 
-        final Map<String, Integer> warnings = new HashMap<>();
-        checks.stream()
-                .map(Object::getClass)
-                .map(Class::getSimpleName)
-                .forEach(checkName -> warnings.put(checkName, 0));
+        rules.forEach(ruleName -> warnings.put(ruleName, 0));
 
-        Consumer<String> incrementWarningCount =
-                (checkName) -> warnings.put(checkName, warnings.get(checkName) + 1);
+        Consumer<Rule> incrementWarningCount = (rule) -> warnings.put(rule, warnings.get(rule) + 1);
 
         EventHelper.fireEvent(EventType.MINING_START, eventHandlers);
-        Set<RuleViolation> analyzeMessages =
-                RuleVerifier.analyze(filesToScan, file, checks, classpath);
+        Set<RuleViolation> ruleViolations =
+                ProjectScanner.scanProject(
+                        target, FileUtils.getClosestDirectory(target), rules, classpath);
         EventHelper.fireEvent(EventType.MINING_END, eventHandlers);
 
-        analyzeMessages.stream().map(RuleViolation::getCheckName).forEach(incrementWarningCount);
+        ruleViolations.stream()
+                .map(RuleViolation::getRuleKey)
+                .map(Rule::of)
+                .forEach(incrementWarningCount);
 
-        analyzeMessages.forEach(
+        ruleViolations.forEach(
                 v ->
                         EventHelper.fireEvent(
                                 new MinedViolationEvent(v, Paths.get(projectPath)), eventHandlers));
 
         Map<String, Integer> warningsWithUpdateKeys = new HashMap<>();
         warnings.forEach(
-                (x, y) -> warningsWithUpdateKeys.put(x + "<" + Checks.getRuleKey(x) + ">", y));
+                (rule, count) ->
+                        warningsWithUpdateKeys.put(
+                                rule.getName() + "Check" + "<" + rule.getKey() + ">", count));
 
         return warningsWithUpdateKeys;
     }

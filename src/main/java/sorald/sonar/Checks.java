@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,26 +28,23 @@ import org.sonar.java.checks.unused.*;
 import org.sonar.java.se.checks.*;
 import org.sonar.plugins.java.api.JavaCheck;
 import org.sonar.plugins.java.api.JavaFileScanner;
+import sorald.rule.RuleType;
 
 /** Class for easily accessing Sonar check classes. */
 @SuppressWarnings({"unchecked", "UnstableApiUsage"})
-public class Checks {
+class Checks {
+    private Checks() {}
 
-    private static final Map<CheckType, Map<String, Class<? extends JavaFileScanner>>>
+    private static final Map<RuleType, Map<String, Class<? extends JavaFileScanner>>>
             TYPE_TO_CHECKS;
 
-    public enum CheckType {
-        BUG,
-        VULNERABILITY,
-        CODE_SMELL,
-        SECURITY_HOTSPOT;
-    }
+    private static final Map<Class<? extends JavaFileScanner>, RuleType> CHECK_TO_TYPE;
 
     /**
      * @param checkType A check type.
      * @return All checks of the given type.
      */
-    public static List<Class<? extends JavaFileScanner>> getChecksByType(CheckType checkType) {
+    static List<Class<? extends JavaFileScanner>> getChecksByType(RuleType checkType) {
         return new ArrayList<>(TYPE_TO_CHECKS.get(checkType).values());
     }
 
@@ -54,7 +52,7 @@ public class Checks {
      * @param checkClass A Sonar check class
      * @return An instance of the passed Sonar check class
      */
-    public static JavaFileScanner instantiateCheck(Class<? extends JavaFileScanner> checkClass) {
+    static JavaFileScanner instantiateCheck(Class<? extends JavaFileScanner> checkClass) {
         try {
             return checkClass.getConstructor().newInstance();
         } catch (Exception e) {
@@ -68,7 +66,7 @@ public class Checks {
      * @param key The key of the check.
      * @return The check class corresponding to the key.
      */
-    public static Class<? extends JavaFileScanner> getCheck(String key) {
+    static Class<? extends JavaFileScanner> getCheck(String key) {
         return TYPE_TO_CHECKS.values().stream()
                 .map(checks -> checks.get(key))
                 .filter(Objects::nonNull)
@@ -82,12 +80,12 @@ public class Checks {
      * @param key The key of the check.
      * @return An instance of the related check class.
      */
-    public static JavaFileScanner getCheckInstance(String key) {
+    static JavaFileScanner getCheckInstance(String key) {
         return instantiateCheck(getCheck(key));
     }
 
     /** @return All Sonar-Java checks that Sorald currently keeps track of. */
-    public static List<Class<? extends JavaFileScanner>> getAllChecks() {
+    static List<Class<? extends JavaFileScanner>> getAllChecks() {
         return TYPE_TO_CHECKS.values().stream()
                 .map(Map::values)
                 .flatMap(Collection::stream)
@@ -99,7 +97,7 @@ public class Checks {
      * @return the numeric identifier of the rule related to the given check class. Non-digits are
      *     stripped, so e.g. S1234 becomes 1234.
      */
-    public static String getRuleKey(Class<? extends JavaCheck> checkClass) {
+    static String getRuleKey(Class<? extends JavaCheck> checkClass) {
         return Arrays.stream(checkClass.getAnnotationsByType(Rule.class))
                 .map(Rule::key)
                 .findFirst()
@@ -110,16 +108,11 @@ public class Checks {
     }
 
     /**
-     * @param checkName A Sonar-Java check name, e.g. "StandardFunctionalInterfaceCheck".
-     * @return the numeric identifier of the rule related to the given check name. Non-digits are
-     *     stripped, so e.g. S1234 becomes 1234.
+     * @param check A check.
+     * @return The rule type associated with this check.
      */
-    public static String getRuleKey(String checkName) {
-        return getAllChecks().stream()
-                .filter(c -> c.getSimpleName().equals(checkName))
-                .map(Checks::getRuleKey)
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No key found for " + checkName));
+    static RuleType getRuleType(Class<? extends JavaFileScanner> check) {
+        return CHECK_TO_TYPE.get(check);
     }
 
     private static Map<String, Class<? extends JavaFileScanner>> createKeyToCheckMap(
@@ -132,11 +125,11 @@ public class Checks {
     }
 
     static {
-        Map<CheckType, Map<String, Class<? extends JavaFileScanner>>> typeToChecks =
-                new EnumMap<>(CheckType.class);
+        Map<RuleType, Map<String, Class<? extends JavaFileScanner>>> typeToChecks =
+                new EnumMap<>(RuleType.class);
 
         typeToChecks.put(
-                CheckType.BUG,
+                RuleType.BUG,
                 createKeyToCheckMap(
                         AbsOnNegativeCheck.class,
                         AllBranchesAreIdenticalCheck.class,
@@ -276,7 +269,7 @@ public class Checks {
                         WrongAssignmentOperatorCheck.class));
 
         typeToChecks.put(
-                CheckType.VULNERABILITY,
+                RuleType.VULNERABILITY,
                 createKeyToCheckMap(
                         AESAlgorithmCheck.class,
                         AuthorizationsStrongDecisionsCheck.class,
@@ -318,7 +311,7 @@ public class Checks {
                         XxeProcessingCheck.class));
 
         typeToChecks.put(
-                CheckType.SECURITY_HOTSPOT,
+                RuleType.SECURITY_HOTSPOT,
                 createKeyToCheckMap(
                         AndroidBroadcastingCheck.class,
                         AndroidExternalStorageCheck.class,
@@ -359,7 +352,7 @@ public class Checks {
                         ZipEntryCheck.class));
 
         typeToChecks.put(
-                CheckType.CODE_SMELL,
+                RuleType.CODE_SMELL,
                 createKeyToCheckMap(
                         AbstractClassNoFieldShouldBeInterfaceCheck.class,
                         AbstractClassWithoutAbstractMethodCheck.class,
@@ -682,8 +675,16 @@ public class Checks {
         TYPE_TO_CHECKS = Collections.unmodifiableMap(typeToChecks);
 
         // sanity check: all CheckType values should be accounted for
-        for (CheckType type : CheckType.values()) {
+        for (RuleType type : RuleType.values()) {
             assert TYPE_TO_CHECKS.containsKey(type);
         }
+
+        Map<Class<? extends JavaFileScanner>, RuleType> checkToType = new IdentityHashMap<>();
+        for (var ruleType : RuleType.values()) {
+            for (var check : TYPE_TO_CHECKS.get(ruleType).values()) {
+                checkToType.put(check, ruleType);
+            }
+        }
+        CHECK_TO_TYPE = Collections.unmodifiableMap(checkToType);
     }
 }

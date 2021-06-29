@@ -1,7 +1,7 @@
 package sorald.event.models;
 
 import java.nio.file.Path;
-import sorald.sonar.RuleViolation;
+import sorald.rule.RuleViolation;
 
 public class WarningLocation {
     private final String filePath;

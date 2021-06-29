@@ -26,9 +26,9 @@ import sorald.event.models.ExecutionInfo;
 import sorald.event.models.miner.MinedViolationEvent;
 import sorald.event.models.repair.RuleRepairStatistics;
 import sorald.processor.SoraldAbstractProcessor;
-import sorald.sonar.Checks;
+import sorald.rule.Rule;
+import sorald.rule.RuleViolation;
 import sorald.sonar.ProjectScanner;
-import sorald.sonar.RuleViolation;
 import sorald.util.MavenUtils;
 
 /** The CLI command for the primary repair application. */
@@ -176,7 +176,7 @@ class RepairCommand extends BaseCommand {
      * Mine violations from the target directory and the given rule key.
      *
      * @param target A target directory.
-     * @param ruleKey A rule key.
+     * @param ruleKey Key of the rule to mine violations of.
      * @param eventHandlers Event handlers to use for events.
      * @param classpath
      * @return All found warnings.
@@ -186,13 +186,11 @@ class RepairCommand extends BaseCommand {
             String ruleKey,
             List<SoraldEventHandler> eventHandlers,
             List<String> classpath) {
+        Rule rule = Rule.of(ruleKey);
         Path projectPath = target.toPath().toAbsolutePath().normalize();
         Set<RuleViolation> violations =
                 ProjectScanner.scanProject(
-                        target,
-                        FileUtils.getClosestDirectory(target),
-                        List.of(Checks.getCheckInstance(ruleKey)),
-                        classpath);
+                        target, FileUtils.getClosestDirectory(target), List.of(rule), classpath);
         violations.forEach(
                 warn ->
                         EventHelper.fireEvent(

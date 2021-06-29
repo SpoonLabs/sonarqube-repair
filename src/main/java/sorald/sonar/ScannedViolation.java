@@ -1,69 +1,57 @@
 package sorald.sonar;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import org.sonar.java.AnalyzerMessage;
-import org.sonar.plugins.java.api.JavaCheck;
+import org.sonarsource.sonarlint.core.client.api.common.TextRange;
+import org.sonarsource.sonarlint.core.client.api.common.analysis.Issue;
+import sorald.rule.RuleViolation;
 
-/** Facade around {@link org.sonar.java.AnalyzerMessage} */
+/** Facade around {@link org.sonarsource.sonarlint.core.client.api.common.analysis.Issue} */
 class ScannedViolation extends RuleViolation {
-    private final AnalyzerMessage message;
-    private final AnalyzerMessage.TextSpan primaryLocation;
+    private final Issue issue;
+    private final TextRange textRange;
 
-    ScannedViolation(AnalyzerMessage message) {
-        if (message.primaryLocation() == null) {
+    ScannedViolation(Issue issue) {
+        textRange = issue.getTextRange();
+        if (textRange == null) {
             throw new IllegalArgumentException(
-                    "message for '"
-                            + getCheckName(message.getCheck())
-                            + "' lacks primary location");
+                    "issue for '" + issue.getRuleKey() + "' lacks primary location");
         }
-        this.message = message;
-        this.primaryLocation = message.primaryLocation();
+        this.issue = issue;
     }
 
     @Override
     public int getStartLine() {
-        return primaryLocation.startLine;
+        return textRange.getStartLine();
     }
 
     @Override
     public int getEndLine() {
-        return primaryLocation.endLine;
+        return textRange.getEndLine();
     }
 
     @Override
     public int getStartCol() {
-        return primaryLocation.startCharacter;
+        return textRange.getStartLineOffset();
     }
 
     @Override
     public int getEndCol() {
-        return primaryLocation.endCharacter;
+        return textRange.getEndLineOffset();
     }
 
     @Override
     public Path getAbsolutePath() {
-        return Paths.get(message.getInputComponent().key().replace(":", ""))
-                .toAbsolutePath()
-                .normalize();
-    }
-
-    @Override
-    public String getCheckName() {
-        return getCheckName(message.getCheck());
+        Path path = issue.getInputFile().getClientObject();
+        return path.toAbsolutePath().normalize();
     }
 
     @Override
     public String getRuleKey() {
-        return Checks.getRuleKey(message.getCheck().getClass());
+        return issue.getRuleKey().split(":")[1];
     }
 
     @Override
     public String getMessage() {
-        return message.getMessage();
-    }
-
-    private static String getCheckName(JavaCheck check) {
-        return check.getClass().getSimpleName();
+        return issue.getMessage();
     }
 }

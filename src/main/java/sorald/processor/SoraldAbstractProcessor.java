@@ -12,7 +12,7 @@ import sorald.event.EventHelper;
 import sorald.event.SoraldEventHandler;
 import sorald.event.models.CrashEvent;
 import sorald.event.models.RepairEvent;
-import sorald.sonar.RuleViolation;
+import sorald.rule.RuleViolation;
 import spoon.processing.AbstractProcessor;
 import spoon.reflect.declaration.CtElement;
 

@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -30,7 +31,8 @@ import sorald.TestHelper;
 import sorald.cli.SoraldVersionProvider;
 import sorald.event.StatsMetadataKeys;
 import sorald.processor.CastArithmeticOperandProcessor;
-import sorald.sonar.Checks;
+import sorald.rule.RuleType;
+import sorald.rule.Rules;
 
 public class WarningMinerTest {
 
@@ -90,8 +92,7 @@ public class WarningMinerTest {
      */
     @Test
     public void warningsMiner_onlyScansForGivenTypes_whenRuleTypesGiven() throws Exception {
-        List<Checks.CheckType> checkTypes =
-                Arrays.asList(Checks.CheckType.VULNERABILITY, Checks.CheckType.CODE_SMELL);
+        Set<RuleType> ruleTypes = Set.of(RuleType.VULNERABILITY, RuleType.CODE_SMELL);
 
         File outputFile = File.createTempFile("warnings", null);
         File temp = Files.createTempDirectory("tempDir").toFile();
@@ -101,14 +102,11 @@ public class WarningMinerTest {
                 outputFile.getPath(),
                 temp.getPath(),
                 Constants.ARG_RULE_TYPES,
-                checkTypes.stream().map(Checks.CheckType::name).collect(Collectors.joining(",")));
+                ruleTypes.stream().map(RuleType::name).collect(Collectors.joining(",")));
 
         List<String> expectedChecks =
-                checkTypes.stream()
-                        .map(Checks::getChecksByType)
-                        .flatMap(List::stream)
-                        .map(Class::getSimpleName)
-                        .map(checkName -> checkName + "<" + Checks.getRuleKey(checkName) + ">")
+                Rules.getRulesByType(ruleTypes).stream()
+                        .map(rule -> rule.getName() + "Check<" + rule.getKey() + ">")
                         .sorted()
                         .collect(Collectors.toList());
         List<String> actualChecks = extractSortedCheckNames(outputFile.toPath());
@@ -150,9 +148,8 @@ public class WarningMinerTest {
         runMiner(REPOS_TXT, outputFile.getPath(), temp.getPath());
 
         List<String> expectedChecks =
-                Checks.getAllChecks().stream()
-                        .map(Class::getSimpleName)
-                        .map(checkName -> checkName + "<" + Checks.getRuleKey(checkName) + ">")
+                Rules.getAllRules().stream()
+                        .map(rule -> rule.getName() + "Check<" + rule.getKey() + ">")
                         .sorted()
                         .collect(Collectors.toList());
         List<String> actualChecks = extractSortedCheckNames(outputFile.toPath());

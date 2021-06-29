@@ -4,6 +4,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static sorald.Assertions.assertHasRuleViolation;
+import static sorald.Assertions.assertNoRuleViolations;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,15 +17,13 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
-import org.sonar.java.checks.ArrayHashCodeAndToStringCheck;
 import sorald.processor.ArrayHashCodeAndToStringProcessor;
 import sorald.processor.ProcessorTestHelper;
 import sorald.processor.SoraldAbstractProcessor;
+import sorald.rule.Rule;
+import sorald.rule.RuleViolation;
 import sorald.segment.Node;
-import sorald.sonar.Checks;
 import sorald.sonar.ProjectScanner;
-import sorald.sonar.RuleVerifier;
-import sorald.sonar.RuleViolation;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtType;
 
@@ -33,9 +33,9 @@ public class SegmentStrategyTest {
         String fileName = "ArrayHashCodeAndToString.java";
         Path workspace = TestHelper.createTemporaryTestResourceWorkspace();
         Path pathToBuggyFile = workspace.resolve(fileName);
+        Rule rule = Rule.of(new ArrayHashCodeAndToStringProcessor().getRuleKey());
 
-        RuleVerifier.verifyHasIssue(
-                pathToBuggyFile.toString(), new ArrayHashCodeAndToStringCheck());
+        assertHasRuleViolation(pathToBuggyFile.toFile(), rule);
         Main.main(
                 new String[] {
                     Constants.REPAIR_COMMAND_NAME,
@@ -53,7 +53,7 @@ public class SegmentStrategyTest {
                     PrettyPrintingStrategy.NORMAL.name()
                 });
         TestHelper.removeComplianceComments(pathToBuggyFile.toString());
-        RuleVerifier.verifyNoIssue(pathToBuggyFile.toString(), new ArrayHashCodeAndToStringCheck());
+        assertNoRuleViolations(pathToBuggyFile.toFile(), rule);
     }
 
     @Test
@@ -61,9 +61,9 @@ public class SegmentStrategyTest {
         String fileName = "ArrayHashCodeAndToString.java";
         Path workspace = TestHelper.createTemporaryTestResourceWorkspace();
         Path pathToBuggyFile = workspace.resolve(fileName);
+        Rule rule = Rule.of(new ArrayHashCodeAndToStringProcessor().getRuleKey());
 
-        RuleVerifier.verifyHasIssue(
-                pathToBuggyFile.toString(), new ArrayHashCodeAndToStringCheck());
+        assertHasRuleViolation(pathToBuggyFile.toFile(), rule);
         String[] args =
                 new String[] {
                     Constants.REPAIR_COMMAND_NAME,
@@ -92,9 +92,7 @@ public class SegmentStrategyTest {
                 new ArrayHashCodeAndToStringProcessor().setEventHandlers(List.of());
         Set<RuleViolation> violations =
                 ProjectScanner.scanProject(
-                        workspace.toFile(),
-                        workspace.toFile(),
-                        Checks.getCheckInstance(processor.getRuleKey()));
+                        workspace.toFile(), workspace.toFile(), Rule.of(processor.getRuleKey()));
 
         // we decide that parsing this class causes crashes
         String crashingClass = "DeadStores";

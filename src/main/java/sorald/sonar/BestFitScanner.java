@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import sorald.FileUtils;
 import sorald.processor.SoraldAbstractProcessor;
+import sorald.rule.RuleViolation;
 import spoon.reflect.declaration.CtCompilationUnit;
 import spoon.reflect.declaration.CtElement;
 import spoon.reflect.declaration.CtType;
